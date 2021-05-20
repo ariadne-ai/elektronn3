@@ -18,6 +18,7 @@ from itertools import islice
 from math import nan
 from pickle import PickleError
 from textwrap import dedent
+import time
 from typing import Tuple, Dict, Optional, Callable, Any, Sequence, List, Union
 
 import inspect
@@ -856,17 +857,18 @@ class Trainer:
             'elektronn3.__version__': elektronn3.__version__,
             'env_info': collect_env.get_pretty_env_info()
         }
-
+        start_time = time.time()
         torch.save({
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
             'lr_sched_state_dict': lr_sched_state,
             'info': info
         }, state_dict_path)
-        log(f'Saved state_dict as {state_dict_path}')
+        log(f'Saved state_dict as {state_dict_path} in {time.time() - start_time:.2f} s')
         pts_model_path = f'{model_path}s'
         try:
             # Try saving directly as an uncompiled nn.Module
+            start_time = time.time()
             torch.save(model, model_path)
             log(f'Saved model as {model_path}')
             if self.save_jit == 'script':  # Compile directly for serialization
@@ -881,14 +883,16 @@ class Trainer:
             if self.save_jit is not None:  # Save jit model, either from script or trace
                 jitmodel.save(pts_model_path)
                 log(f'Saved jitted model ({self.save_jit}) as {pts_model_path}')
+            log(f'saving took {time.time() - start_time:.2f}')
         except (TypeError, PickleError) as exc:
             # If model is already a ScriptModule, it can't be saved with torch.save()
             # Use ScriptModule.save() instead in this case.
             # Using the file extension '.pts' to show it's a ScriptModule.
             if isinstance(model, torch.jit.ScriptModule):
+                start_time = time.time()
                 model_path += 's'
                 model.save(pts_model_path)
-                log(f'Saved jitted model as {pts_model_path}')
+                log(f'Saved jitted model as {pts_model_path} in {time.time() - start_time:.2f} s')
             else:
                 raise exc
         finally:
