@@ -811,3 +811,30 @@ class TripletData2d(data.Dataset):
         return len(self.inp_paths) * self.epoch_multiplier
 
 # TODO: Warn if datasets have no content
+
+def load_segmentation_data_paths(gt_root_path: str, is_2d: bool, class_ids: Sequence[int], train_with_everything: bool = False, gt_priority: Dict[str, Union[int, float]] = {}):
+    if is_2d:
+        input_paths = sorted(glob.glob(f'{gt_root_path}/**/*_input', recursive=True)) # multi dataset input
+        if len(input_paths) == 0:
+            input_paths = sorted(glob.glob(f'{gt_root_path}/**/*_raw*.png', recursive=True)) # single dataset input
+        target_paths = sorted(list(glob.glob(f'{gt_root_path}/**/*_seg.png', recursive=True)))
+    else:
+        input_paths = [(input_path, 'raw_data') for input_path in sorted(glob.glob(f'{gt_root_path}/**/*.h5', recursive=True))]
+        target_paths = [(input_path[0], 'labels') for input_path in input_paths]
+        cube_prios = np.ones(len(input_paths))
+        for i, (path, _) in enumerate(input_paths):
+            name = os.path.basename(path).lower()
+            for search_term, prio in gt_priority.items():
+                if search_term in name:
+                    cube_prios[i] = prio
+    assert 0 < len(input_paths) == len(target_paths), f'Training empty or input length ({len(input_paths)}) ≠ target length ({len(target_paths)})'
+    train_data = []
+    valid_data = []
+    if train_with_everything:
+        train_data = [(input_path, target_paths[i]) + ((cube_prios[i],) if not is_2d else ()) for i, input_path in enumerate(input_paths)]
+    else:
+        for i, source in enumerate(input_paths):
+            path = source if is_2d else source[0]
+            (valid_data if 'valid' in os.path.basename(path).lower() else train_data).append((source, target_paths[i]) + ((cube_prios[i],) if not is_2d else ()))
+
+    return train_data, valid_data
