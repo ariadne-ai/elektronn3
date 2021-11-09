@@ -745,6 +745,7 @@ class RandomCrop:
 
         if target.ndim == inp.ndim - 1:  # inp: (C, [D,], H, W), target: ([D,], H, W)
             full_slice = full_slice[1:]  # Remove C axis from slice because target doesn't have it
+        assert inp.shape[-target.ndim:] == target.shape, f'RandomCrop only supports targets ({target.shape}) of identical shape to input {inp.shape}.'
         target_cropped = target[full_slice]
         return inp_cropped, target_cropped
 
