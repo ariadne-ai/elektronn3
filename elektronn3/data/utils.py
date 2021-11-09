@@ -67,12 +67,15 @@ def calculate_offset(model, tile_shape=None):
             example_inp = torch.randn(1, param.size()[1], *tile_shape, device=param.device, dtype=param.dtype)
             example_out = model.eval().forward(example_inp)
         else:
-            try: # default for 3d UNet
-                example_inp = torch.randn(1, param.size()[1], 90, 90, 90, device=param.device, dtype=param.dtype)
-                example_out = model.eval().forward(example_inp)
-            except RuntimeError: # default for 2d UNet
-                example_inp = torch.randn(1, param.size()[1], 186, 186, device=param.device, dtype=param.dtype)
-                example_out = model.eval().forward(example_inp)
+            shapes = [(90, 90, 90), (186, 186), (10, 186, 186)]
+            for i, shape in enumerate(shapes):
+                try:
+                    example_inp = torch.randn(1, param.size()[1], *shape, device=param.device, dtype=param.dtype)
+                    example_out = model.eval().forward(example_inp)
+                    break
+                except RuntimeError:
+                    if i+1 == len(shapes):
+                        raise NotImplementedError(f'none of the tested shapes {shapes} could be used to calculate the offsets for this model')
     offset = np.subtract(example_inp.shape[2:], example_out.shape[2:]) // 2
     logger.info(f'Inferred target offset: {offset}.')
     return offset
