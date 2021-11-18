@@ -812,7 +812,7 @@ class TripletData2d(data.Dataset):
 
 # TODO: Warn if datasets have no content
 
-def load_segmentation_data_paths(gt_root_path: str, is_2d: bool, class_ids: Sequence[int], train_with_everything: bool = False, gt_priority: Dict[str, Union[int, float]] = {}):
+def load_segmentation_data_paths(gt_root_path: str, is_2d: bool, train_with_everything: bool = False, gt_priority: Dict[str, Union[int, float]] = {}):
     if is_2d:
         input_paths = sorted(glob.glob(f'{gt_root_path}/**/*_input', recursive=True)) # multi dataset input
         if len(input_paths) == 0:
