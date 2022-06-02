@@ -62,18 +62,26 @@ def calculate_stds(inputs: Sequence) -> Tuple[float]:
 
 def calculate_offset(model, tile_shape=None):
     with torch.no_grad():
-        param = next(model.parameters())
+        num_in_channels = 1
+        # workaround for the very first parameters being something 
+        # different than the first layer. Assumption that first model
+        # parameter with more than 1 dimension is the first input layer 
+        # and hence delivers the number of input channels
+        for param in model.parameters():
+            if len(param.size()) > 1:
+                num_in_channels = param.size()[1]
+                break
         if tile_shape:
-            example_inp = torch.randn(1, param.size()[1], *tile_shape, device=param.device, dtype=param.dtype)
+            example_inp = torch.randn(1, num_in_channels, *tile_shape, device=param.device, dtype=param.dtype)
             example_out = model.eval().forward(example_inp)
         else:
-            shapes = [(90, 90, 90), (186, 186), (10, 186, 186)]
+            shapes = [(88, 88), (90, 90, 90), (186, 186), (10, 186, 186)]
             for i, shape in enumerate(shapes):
                 try:
-                    example_inp = torch.randn(1, param.size()[1], *shape, device=param.device, dtype=param.dtype)
+                    example_inp = torch.randn(1, num_in_channels, *shape, device=param.device, dtype=param.dtype)
                     example_out = model.eval().forward(example_inp)
                     break
-                except RuntimeError:
+                except (RuntimeError, ValueError):
                     if i+1 == len(shapes):
                         raise NotImplementedError(f'none of the tested shapes {shapes} could be used to calculate the offsets for this model')
     offset = np.subtract(example_inp.shape[2:], example_out.shape[2:]) // 2
