@@ -817,7 +817,7 @@ def load_segmentation_data_paths(gt_root_path: str, is_2d: bool, train_with_ever
         input_paths = sorted(glob.glob(f'{gt_root_path}/**/*_input', recursive=True)) # multi dataset input
         if len(input_paths) == 0:
             input_paths = sorted(glob.glob(f'{gt_root_path}/**/*_raw*.png', recursive=True)) # single dataset input
-        target_paths = sorted(list(glob.glob(f'{gt_root_path}/**/*_seg.png', recursive=True)))
+        target_paths = sorted(list(glob.glob(f'{gt_root_path}/**/*_seg.*', recursive=True)))
     else:
         input_paths = [(input_path, 'raw_data') for input_path in sorted(glob.glob(f'{gt_root_path}/**/*.h5', recursive=True))]
         target_paths = [(input_path[0], 'labels') for input_path in input_paths]
