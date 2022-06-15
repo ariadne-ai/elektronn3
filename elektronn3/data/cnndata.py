@@ -665,7 +665,7 @@ class Segmentation2d(data.Dataset):
                 pass
         if np.any(self.offset):
             off = self.offset
-            target = target[off[0]:-off[0], off[1]:-off[1]]
+            target = target[..., off[0]:-off[0], off[1]:-off[1]]
         sample = {
             'inp': torch.as_tensor(inp.astype(self.inp_dtype)),
             'target': torch.as_tensor(target.astype(self.target_dtype)),
