@@ -40,9 +40,9 @@ def get_cmap(out_channels: int):
 
 def plot_image(
         image: np.ndarray,
+        cmap,
         overlay: Optional[np.ndarray] = None,
         overlay_alpha=0.5,
-        cmap=None,
         colorbar=True,
         filename=None,
         vmin=None,
@@ -318,7 +318,6 @@ def _tb_log_sample_images(
             padded_target_batch[slc] = target_batch
             target_batch = padded_target_batch
 
-    target_cmap = E3_CMAP
     batch2img = _get_batch2img_function(out_batch, z_plane)
     if target_batch is not None:
         target_slice = batch2img(target_batch)
@@ -330,12 +329,10 @@ def _tb_log_sample_images(
             # RGB images need to be transposed to (H, W, C) layout so matplotlib can handle them
             target_slice = np.moveaxis(target_slice, 0, -1)  # (C, H, W) -> (H, W, C)
             out_slice = np.moveaxis(out_slice, 0, -1)
-            target_cmap = None
         elif target_slice.shape[0] == 2:
             pass
         elif target_slice.shape[0] == 1:
-            # target_slice = target_slice[0]
-            target_cmap = 'gray'
+            target_slice = target_slice[0]
         else:
             raise RuntimeError(
                 f'Can\'t prepare targets of shape {target_batch.shape} for plotting.'
@@ -387,12 +384,17 @@ def _tb_log_sample_images(
 
     if target_batch is not None:
         _out_channels = trainer.max_plot_id if is_classification else None
-        _cmap = class_cmap if is_classification else 'gray'
+        _cmap = 'gray'
+        vmin = vmax = None
+        if is_classification:
+            _cmap = class_cmap
+            vmin = 0
+            vmax = trainer.max_plot_id
+
         trainer.tb.add_figure(
             f'{group}/target',
             plot_image(
-                target_slice, vmin=0, vmax=trainer.max_plot_id, filename=name, cmap=_cmap
-                # vmin=0., vmax=1.
+                target_slice, filename=name, vmin=vmin, vmax=vmax, cmap=_cmap
             ),
             global_step=trainer.step
         )
@@ -410,8 +412,7 @@ def _tb_log_sample_images(
         trainer.tb.add_figure(
             f'{group}/out{c}',
             plot_image(
-                out_slice[c], cmap='gray', filename=name,
-                # vmin=0., vmax=1.
+                out_slice[c], cmap='gray', filename=name
             ),
             global_step=trainer.step
         )
