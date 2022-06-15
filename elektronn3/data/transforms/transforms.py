@@ -23,6 +23,7 @@ import numpy as np
 import skimage.exposure
 import skimage.transform
 
+from scipy.ndimage import find_objects
 from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.interpolation import map_coordinates
 from scipy.ndimage.morphology import distance_transform_edt
@@ -331,6 +332,49 @@ class DistanceTransformTarget:
             target = target == 0
         else:
             target = target > 0
+        dist = self.edt(target)
+        if self.signed:
+            # Compute same transform on the inverted target. The inverse transform can be
+            #  subtracted from the original transform to get a signed distance transform.
+            invdist = self.edt(~target)
+            dist -= invdist
+        if self.normalize_fn is not None:
+            dist = self.normalize_fn(dist / self.scale)
+        return inp, dist
+
+
+class DistanceTransformInstanceTarget:
+    """Like DistanceTransformTarget but applied on each ID individually, i.e.
+    suitable for instance segmentation input.
+    """
+    def __init__(
+            self,
+            scale: Optional[float] = 50.,
+            normalize_fn: Optional[Callable[[np.ndarray], np.ndarray]] = np.tanh,
+            signed: bool = True
+    ):
+        self.scale = scale
+        self.normalize_fn = normalize_fn
+        self.signed = signed
+
+    def edt(self, target: np.ndarray) -> np.ndarray:
+        dist = np.zeros(shape=target.shape, dtype=np.float32)
+        for seg_id, bbox in map(lambda id_bbox: (id_bbox[0] + 1, id_bbox[1]), filter(lambda idx_bbox: idx_bbox[1] is not None, enumerate(find_objects(target)))):
+            yrange, xrange = bbox
+            bbox = (slice(yrange.start - 1, yrange.stop + 1, None), slice(xrange.start - 1, xrange.stop + 1, None))
+            bbox_view = target[bbox]
+            view_fg = bbox_view == seg_id
+            view_dt = distance_transform_edt(view_fg)
+            dist[bbox][view_dt > 0] = view_dt[view_dt > 0]
+        return dist[None]
+
+    def __call__(
+            self,
+            inp: np.ndarray,  # returned without modifications
+            target: Optional[np.ndarray]
+    ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        if target is None:
+            return inp, target
         dist = self.edt(target)
         if self.signed:
             # Compute same transform on the inverted target. The inverse transform can be
