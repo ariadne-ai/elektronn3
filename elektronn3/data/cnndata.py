@@ -835,6 +835,6 @@ def load_segmentation_data_paths(gt_root_path: str, is_2d: bool, train_with_ever
     else:
         for i, source in enumerate(input_paths):
             path = source if is_2d else source[0]
-            (valid_data if 'valid' in os.path.basename(path).lower() else train_data).append((source, target_paths[i]) + ((cube_prios[i],) if not is_2d else ()))
+            (valid_data if 'valid' in os.path.basename(path).lower() or 'valid' in os.path.basename(os.path.dirname(path)).lower() else train_data).append((source, target_paths[i]) + ((cube_prios[i],) if not is_2d else ()))
 
     return train_data, valid_data
