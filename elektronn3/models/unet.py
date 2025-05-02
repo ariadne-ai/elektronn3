@@ -129,7 +129,7 @@ def planar_pad(x):
 
 
 def conv3(in_channels, out_channels, kernel_size=3, stride=1,
-          padding=1, bias=True, planar=False, dim=3):
+          padding=1, bias=True, planar=False, dim=3, dilation=1):
     """Returns an appropriate spatial convolution layer, depending on args.
     - dim=2: Conv2d with 3x3 kernel
     - dim=3 and planar=False: Conv3d with 3x3x3 kernel
@@ -145,11 +145,12 @@ def conv3(in_channels, out_channels, kernel_size=3, stride=1,
         kernel_size=kernel_size,
         stride=stride,
         padding=padding,
-        bias=bias
+        bias=bias,
+        dilation=dilation
     )
 
 
-def upconv2(in_channels, out_channels, mode='transpose', planar=False, dim=3):
+def upconv2(in_channels, out_channels, mode='transpose', planar=False, dim=3, dilation=1):
     """Returns a learned upsampling operator depending on args."""
     kernel_size = 2
     stride = 2
@@ -161,7 +162,7 @@ def upconv2(in_channels, out_channels, mode='transpose', planar=False, dim=3):
             in_channels,
             out_channels,
             kernel_size=kernel_size,
-            stride=stride
+            stride=stride,
         )
     elif 'resizeconv' in mode:
         if 'linear' in mode:
@@ -171,13 +172,13 @@ def upconv2(in_channels, out_channels, mode='transpose', planar=False, dim=3):
         rc_kernel_size = 1 if mode.endswith('1') else 3
         return ResizeConv(
             in_channels, out_channels, planar=planar, dim=dim,
-            upsampling_mode=upsampling_mode, kernel_size=rc_kernel_size
+            upsampling_mode=upsampling_mode, kernel_size=rc_kernel_size, dilation=dilation
         )
 
 
-def conv1(in_channels, out_channels, dim=3):
+def conv1(in_channels, out_channels, dim=3, dilation=1):
     """Returns a 1x1 or 1x1x1 convolution, depending on dim"""
-    return get_conv(dim)(in_channels, out_channels, kernel_size=1)
+    return get_conv(dim)(in_channels, out_channels, kernel_size = 1, dilation=dilation)
 
 
 def get_activation(activation):
@@ -205,7 +206,7 @@ class DownConv(nn.Module):
     A ReLU activation follows each convolution.
     """
     def __init__(self, in_channels, out_channels, pooling=True, planar=False, activation='relu',
-                 normalization=None, full_norm=True, dim=3, conv_mode='same'):
+                 normalization=None, full_norm=True, dim=3, conv_mode='same', dilation=1):
         super().__init__()
 
         self.in_channels = in_channels
@@ -213,13 +214,13 @@ class DownConv(nn.Module):
         self.pooling = pooling
         self.normalization = normalization
         self.dim = dim
-        padding = 1 if 'same' in conv_mode else 0
-
+        self.dilation = dilation
+        padding = dilation if 'same' in conv_mode else 0
         self.conv1 = conv3(
-            self.in_channels, self.out_channels, planar=planar, dim=dim, padding=padding
+            self.in_channels, self.out_channels, planar=planar, dim=dim, padding=padding, dilation=self.dilation
         )
         self.conv2 = conv3(
-            self.out_channels, self.out_channels, planar=planar, dim=dim, padding=padding
+            self.out_channels, self.out_channels, planar=planar, dim=dim, padding=padding, dilation=self.dilation
         )
 
         if self.pooling:
@@ -336,7 +337,8 @@ class UpConv(nn.Module):
     def __init__(self, in_channels, out_channels,
                  merge_mode='concat', up_mode='transpose', planar=False,
                  activation='relu', normalization=None, full_norm=True, dim=3, conv_mode='same',
-                 attention=False):
+                 attention=False,
+                 dilation=1):
         super().__init__()
 
         self.in_channels = in_channels
@@ -344,22 +346,22 @@ class UpConv(nn.Module):
         self.merge_mode = merge_mode
         self.up_mode = up_mode
         self.normalization = normalization
-        padding = 1 if 'same' in conv_mode else 0
-
+        self.dilation = dilation
+        padding = dilation if 'same' in conv_mode else 0
         self.upconv = upconv2(self.in_channels, self.out_channels,
-                              mode=self.up_mode, planar=planar, dim=dim)
+                              mode=self.up_mode, planar=planar, dim=dim, dilation=self.dilation)
 
         if self.merge_mode == 'concat':
             self.conv1 = conv3(
-                2*self.out_channels, self.out_channels, planar=planar, dim=dim, padding=padding
+                2*self.out_channels, self.out_channels, planar=planar, dim=dim, padding=padding, dilation=self.dilation
             )
         else:
             # num of input channels to conv2 is same
             self.conv1 = conv3(
-                self.out_channels, self.out_channels, planar=planar, dim=dim, padding=padding
+                self.out_channels, self.out_channels, planar=planar, dim=dim, padding=padding, dilation=self.dilation
             )
         self.conv2 = conv3(
-            self.out_channels, self.out_channels, planar=planar, dim=dim, padding=padding
+            self.out_channels, self.out_channels, planar=planar, dim=dim, padding=padding, dilation=self.dilation
         )
 
         self.act0 = get_activation(activation)
@@ -418,7 +420,7 @@ class ResizeConv(nn.Module):
     - https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/issues/190
     """
     def __init__(self, in_channels, out_channels, kernel_size=3, planar=False, dim=3,
-                 upsampling_mode='nearest'):
+                 upsampling_mode='nearest', dilation=1):
         super().__init__()
         self.upsampling_mode = upsampling_mode
         self.scale_factor = 2
@@ -436,12 +438,13 @@ class ResizeConv(nn.Module):
         #   higher-dimensional features, which subsequent layers can't access
         #   (at least in U-Net out_channels == in_channels // 2).
         # --> Needs empirical evaluation
+        self.dilation = dilation
         if kernel_size == 3:
             self.conv = conv3(
-                in_channels, out_channels, padding=1, planar=planar, dim=dim
+                in_channels, out_channels, padding=1, planar=planar, dim=dim, dilation=self.dilation
             )
         elif kernel_size == 1:
-            self.conv = conv1(in_channels, out_channels, dim=dim)
+            self.conv = conv1(in_channels, out_channels, dim=dim, dilation=self.dilation)
         else:
             raise ValueError(f'kernel_size={kernel_size} is not supported. Choose 1 or 3.')
 
@@ -768,6 +771,7 @@ class UNet(nn.Module):
             full_norm: bool = True,
             dim: int = 3,
             conv_mode: str = 'same',
+            dilation: int = 1,
     ):
         super().__init__()
 
@@ -817,6 +821,7 @@ class UNet(nn.Module):
         self.in_channels = in_channels
         self.start_filts = start_filts
         self.n_blocks = n_blocks
+        self.dilation = dilation
         self.normalization = normalization
         self.attention = attention
         self.conv_mode = conv_mode
@@ -853,6 +858,7 @@ class UNet(nn.Module):
                 full_norm=full_norm,
                 dim=dim,
                 conv_mode=conv_mode,
+                dilation=dilation,
             )
             self.down_convs.append(down_conv)
 
@@ -875,6 +881,7 @@ class UNet(nn.Module):
                 full_norm=full_norm,
                 dim=dim,
                 conv_mode=conv_mode,
+                dilation=dilation,
             )
             self.up_convs.append(up_conv)
 
