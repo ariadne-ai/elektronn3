@@ -2,7 +2,7 @@
 # (C) torchcontrib authors
 # Vendored here because torchcontrib was not conda-installable as of the time of including this.
 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from itertools import chain
 from torch.optim import Optimizer
 import torch
@@ -121,6 +121,13 @@ class SWA(Optimizer):
         for group in self.param_groups:
             group['n_avg'] = 0
             group['step_counter'] = 0
+
+        self._optimizer_step_pre_hooks = OrderedDict()
+        self._optimizer_step_post_hooks = OrderedDict()
+        self._optimizer_state_dict_pre_hooks = OrderedDict()
+        self._optimizer_state_dict_post_hooks = OrderedDict()
+        self._optimizer_load_state_dict_pre_hooks = OrderedDict()
+        self._optimizer_load_state_dict_post_hooks = OrderedDict()
 
     @staticmethod
     def _check_params(self, swa_start, swa_freq):
