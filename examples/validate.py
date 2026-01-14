@@ -55,7 +55,7 @@ def load_model(model_path: str, device: torch.device):
     if model_path.endswith('.pts'):
         return torch.jit.load(model_path, map_location=device)
     elif model_path.endswith('.pt'):
-        return torch.load(model_path, map_location=device)
+        return torch.load(model_path, map_location=device, weights_only=False)
     else:
         raise ValueError(f'{model_path} has an unkown file extension. Supported are .pt and .pts')
 

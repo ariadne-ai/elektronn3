@@ -89,7 +89,7 @@ lr_dec = 0.995
 batch_size = 1
 
 if args.resume is not None:  # Load pretrained network params
-    model.load_state_dict(torch.load(os.path.expanduser(args.resume)))
+    model.load_state_dict(torch.load(os.path.expanduser(args.resume), weights_only=False))
 
 dataset_mean = (143.97594,)
 dataset_std = (44.264744,)

@@ -414,14 +414,14 @@ class Predictor:
                 if model.endswith('.pts'):
                     model = torch.jit.load(model, map_location=device)
                 elif model.endswith('.pt'):
-                    model = torch.load(model, map_location=device)
+                    model = torch.load(model, map_location=device, weights_only=False)
                 else:
                     raise ValueError(f'{model} has an unkown file extension. Supported are .pt and .pts')
             else:
                 raise ValueError(f'Model path {model} not found.')
         self.model = model
         if isinstance(state_dict_src, str):
-            state_dict = torch.load(state_dict_src)
+            state_dict = torch.load(state_dict_src, weights_only=False)
             if 'model_state_dict' in state_dict:  # Handle nested dicts
                 state_dict = state_dict['model_state_dict']
         elif isinstance(state_dict_src, dict) or state_dict_src is None:
