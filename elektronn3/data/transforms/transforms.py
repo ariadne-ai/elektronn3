@@ -935,10 +935,29 @@ class ElasticTransform:
             ish = np.array(inp.shape[-2:])
             dy = gaussian_filter(np.random.rand(*ish) * 2 - 1, self.sigma, mode="constant", cval=0) * self.alpha
             dx = gaussian_filter(np.random.rand(*ish) * 2 - 1, self.sigma, mode="constant", cval=0) * self.alpha
+            """
+            There seems to be a mismatch between how np.meshgrid is used and how the dimensions are ordered in the input array.
+            Let's break it down:
+            For a 3D input with shape (C, H, W):
+            inp.shape[-2:] gives us (H, W)
+            So ish becomes np.array([H, W])
+            However, when creating the meshgrid:
+            np.meshgrid by default uses 'xy' indexing, which means:
+            First argument corresponds to x-coordinates (columns)
+            Second argument corresponds to y-coordinates (rows)
+            This creates a mismatch because:
+            ish[0] is H (rows)
+            ish[1] is W (columns)
+            But meshgrid expects (W, H) order for xy-indexing
+            To fix this, there are two options:
+            - Either use indexing='ij' in meshgrid (like it's done in the 4D case),
+            - Or swap the order when creating the meshgrid
+            """
             y, x = np.array(
-                np.meshgrid(np.arange(ish[0]), np.arange(ish[1])),
+                np.meshgrid(np.arange(ish[0]), np.arange(ish[1]), indexing='ij'),
                 dtype=np.float64
             )
+
             y += dy
             x += dx
             indices = np.reshape(y, (-1, 1)), np.reshape(x, (-1, 1))
