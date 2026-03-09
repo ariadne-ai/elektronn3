@@ -45,7 +45,8 @@ class HDF5DataSource(DataSource):
 
     # Wraps direct attribute, property and method access
     def __getattr__(self, attr: str) -> Any:
-        if self.in_memory:
+        in_memory = self.__dict__.get('in_memory', False)
+        if in_memory:
             h5data = self._data
             return getattr(h5data, attr)
         with h5py.File(self.fname, 'r') as f:
@@ -54,7 +55,8 @@ class HDF5DataSource(DataSource):
 
     # But dunder methods have to be wrapped manually: https://stackoverflow.com/a/3700899
     def __getitem__(self, idx: Union[int, slice]) -> np.ndarray:
-        if self.in_memory:
+        in_memory = self.__dict__.get('in_memory', False)
+        if in_memory:
             h5data = self._data
             return h5data[idx]
         with h5py.File(self.fname, 'r') as f:
