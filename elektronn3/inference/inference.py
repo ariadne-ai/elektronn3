@@ -345,6 +345,9 @@ class Predictor:
         augmentations: List of test-time augmentations or integer that
             specifies the number of different flips to be performed as test-
             time augmentations.
+        tta_aggregation: Aggregation method for combining multiple test-time
+            augmented predictions (when ``augmentations`` is not ``None``).
+            Supported values are ``"mean"`` (default) and ``"max"``.
         strict_shapes: If ``False`` (default), force the ``output_shape`` to be
             a multiple of the ``tile_shape`` by padding the input. This allows
             for greater flexibility of the ``tile_shape`` but potentially wastes
@@ -378,6 +381,7 @@ class Predictor:
             apply_softmax: bool = True,
             transform: Optional[Transform] = None,
             augmentations: Union[int, Optional[Sequence]] = None,
+            tta_aggregation: str = "mean",
             strict_shapes: bool = False,
             apply_argmax: bool = False,
             argmax_with_threshold: Optional[float] = None,
@@ -404,6 +408,12 @@ class Predictor:
         if isinstance(augmentations, int):
             augmentations = DEFAULT_AUGMENTATIONS_3D[:augmentations]
         self.augmentations = augmentations
+        self.tta_aggregation = tta_aggregation
+        if self.augmentations is not None and self.tta_aggregation not in ("mean", "max"):
+            raise ValueError(
+                f'Unknown tta_aggregation={self.tta_aggregation!r}. '
+                'Supported values: "mean", "max".'
+            )
         self.strict_shapes = strict_shapes
         self.apply_argmax = apply_argmax
         self.argmax_with_threshold = argmax_with_threshold
@@ -504,7 +514,13 @@ class Predictor:
                     dout = dout[crop_slice]
                 douts.append(dout)
             douts = torch.stack(douts)
-            dout = torch.mean(douts, dim=0)
+            if self.tta_aggregation == "mean":
+                dout = torch.mean(douts, dim=0)
+            elif self.tta_aggregation == "max":
+                dout = torch.amax(douts, dim=0)
+            else:
+                # Should be unreachable due to validation in __init__
+                raise RuntimeError(f"Invalid tta_aggregation: {self.tta_aggregation!r}")
 
         # if no augmentations, argmax was already applied by the model
         if self.apply_argmax_after_tta:
